@@ -1,11 +1,11 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
+import { simpleStorage as storage } from "./simple-storage";
 import { setupMockAuth, isAuthenticated } from "./mockAuth";
-import { authorize, authorizeResourceOwnership, authorizeCityAccess, type AuthenticatedRequest } from "./middleware/authorization";
+// import { authorize, authorizeResourceOwnership, authorizeCityAccess, type AuthenticatedRequest } from "./middleware/authorization";
 import { z } from "zod";
-import { insertProjectSchema, insertLeadSchema, insertVendorSchema, insertProductSchema, insertCitySchema } from "@shared/schema";
-import { notificationService } from "./services/notificationService";
+// import { insertProjectSchema, insertLeadSchema, insertVendorSchema, insertProductSchema, insertCitySchema } from "@shared/schema";
+// import { notificationService } from "./services/notificationService";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup mock authentication instead of Replit OAuth
