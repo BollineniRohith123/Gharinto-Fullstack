@@ -10,6 +10,12 @@ import {
   documents,
   notifications,
   platformConfig,
+  roles,
+  permissions,
+  rolePermissions,
+  menuItems,
+  testimonials,
+  leadSources,
   type User,
   type UpsertUser,
   type City,
@@ -21,6 +27,12 @@ import {
   type Document,
   type Notification,
   type PlatformConfig,
+  type Role,
+  type Permission,
+  type RolePermission,
+  type MenuItem,
+  type Testimonial,
+  type LeadSource,
   type InsertUser,
   type InsertCity,
   type InsertProject,
@@ -30,6 +42,10 @@ import {
   type InsertOrder,
   type InsertDocument,
   type InsertNotification,
+  type InsertRole,
+  type InsertPermission,
+  type InsertMenuItem,
+  type InsertTestimonial,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, count, sum, sql } from "drizzle-orm";
@@ -104,6 +120,59 @@ export interface IStorage {
   // Platform configuration
   getPlatformConfig(): Promise<PlatformConfig | undefined>;
   updatePlatformConfig(config: Partial<PlatformConfig>): Promise<void>;
+  
+  // RBAC operations
+  getRoles(): Promise<Role[]>;
+  getRoleById(id: string): Promise<Role | undefined>;
+  createRole(role: InsertRole): Promise<Role>;
+  updateRole(id: string, role: Partial<Role>): Promise<void>;
+  deleteRole(id: string): Promise<void>;
+  
+  getPermissions(): Promise<Permission[]>;
+  getPermissionsByModule(module: string): Promise<Permission[]>;
+  createPermission(permission: InsertPermission): Promise<Permission>;
+  
+  getRolePermissions(roleId: string): Promise<RolePermission[]>;
+  assignPermissionsToRole(roleId: string, permissionIds: string[]): Promise<void>;
+  
+  getMenuItemsByRole(roleId: string): Promise<MenuItem[]>;
+  createMenuItem(menuItem: InsertMenuItem): Promise<MenuItem>;
+  updateMenuItem(id: string, menuItem: Partial<MenuItem>): Promise<void>;
+  deleteMenuItem(id: string): Promise<void>;
+  
+  // Testimonials
+  getTestimonials(activeOnly?: boolean): Promise<Testimonial[]>;
+  createTestimonial(testimonial: InsertTestimonial): Promise<Testimonial>;
+  updateTestimonial(id: string, testimonial: Partial<Testimonial>): Promise<void>;
+  deleteTestimonial(id: string): Promise<void>;
+  
+  // Lead sources
+  getLeadSources(): Promise<LeadSource[]>;
+  createLeadSource(leadSource: Partial<LeadSource>): Promise<LeadSource>;
+  
+  // Enhanced analytics
+  getVendorStats(vendorId: string): Promise<{
+    totalProducts: number;
+    activeOrders: number;
+    monthlyRevenue: string;
+    inventoryItems: number;
+  }>;
+  
+  getDesignerStats(designerId: string): Promise<{
+    activeProjects: number;
+    completedProjects: number;
+    totalRevenue: string;
+    customerRating: number;
+  }>;
+  
+  getAdminCityStats(cityId?: string): Promise<Array<{
+    cityName: string;
+    activeProjects: number;
+    pendingLeads: number;
+    revenue: string;
+    designersCount: number;
+    vendorsCount: number;
+  }>>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -373,6 +442,185 @@ export class DatabaseStorage implements IStorage {
     } else {
       await db.insert(platformConfig).values({ ...config, updatedAt: new Date() });
     }
+  }
+
+  // RBAC operations
+  async getRoles(): Promise<Role[]> {
+    return await db.select().from(roles).where(eq(roles.isActive, true)).orderBy(asc(roles.level), asc(roles.name));
+  }
+
+  async getRoleById(id: string): Promise<Role | undefined> {
+    const [role] = await db.select().from(roles).where(eq(roles.id, id));
+    return role;
+  }
+
+  async createRole(role: InsertRole): Promise<Role> {
+    const [newRole] = await db.insert(roles).values(role).returning();
+    return newRole;
+  }
+
+  async updateRole(id: string, roleData: Partial<Role>): Promise<void> {
+    await db.update(roles).set({ ...roleData, updatedAt: new Date() }).where(eq(roles.id, id));
+  }
+
+  async deleteRole(id: string): Promise<void> {
+    await db.update(roles).set({ isActive: false, updatedAt: new Date() }).where(eq(roles.id, id));
+  }
+
+  async getPermissions(): Promise<Permission[]> {
+    return await db.select().from(permissions).orderBy(asc(permissions.module), asc(permissions.action));
+  }
+
+  async getPermissionsByModule(module: string): Promise<Permission[]> {
+    return await db.select().from(permissions).where(eq(permissions.module, module)).orderBy(asc(permissions.action));
+  }
+
+  async createPermission(permission: InsertPermission): Promise<Permission> {
+    const [newPermission] = await db.insert(permissions).values(permission).returning();
+    return newPermission;
+  }
+
+  async getRolePermissions(roleId: string): Promise<RolePermission[]> {
+    return await db.select().from(rolePermissions).where(eq(rolePermissions.roleId, roleId));
+  }
+
+  async assignPermissionsToRole(roleId: string, permissionIds: string[]): Promise<void> {
+    // First, remove all existing permissions for this role
+    await db.delete(rolePermissions).where(eq(rolePermissions.roleId, roleId));
+    
+    // Then, add the new permissions
+    if (permissionIds.length > 0) {
+      const rolePermissionData = permissionIds.map(permissionId => ({
+        roleId,
+        permissionId
+      }));
+      await db.insert(rolePermissions).values(rolePermissionData);
+    }
+  }
+
+  async getMenuItemsByRole(roleId: string): Promise<MenuItem[]> {
+    return await db.select().from(menuItems)
+      .where(and(eq(menuItems.roleId, roleId), eq(menuItems.isActive, true)))
+      .orderBy(asc(menuItems.sortOrder), asc(menuItems.label));
+  }
+
+  async createMenuItem(menuItem: InsertMenuItem): Promise<MenuItem> {
+    const [newMenuItem] = await db.insert(menuItems).values(menuItem).returning();
+    return newMenuItem;
+  }
+
+  async updateMenuItem(id: string, menuItemData: Partial<MenuItem>): Promise<void> {
+    await db.update(menuItems).set(menuItemData).where(eq(menuItems.id, id));
+  }
+
+  async deleteMenuItem(id: string): Promise<void> {
+    await db.delete(menuItems).where(eq(menuItems.id, id));
+  }
+
+  // Testimonials
+  async getTestimonials(activeOnly: boolean = true): Promise<Testimonial[]> {
+    let query = db.select().from(testimonials);
+    
+    if (activeOnly) {
+      query = query.where(eq(testimonials.isActive, true));
+    }
+    
+    return await query.orderBy(asc(testimonials.sortOrder), desc(testimonials.createdAt));
+  }
+
+  async createTestimonial(testimonial: InsertTestimonial): Promise<Testimonial> {
+    const [newTestimonial] = await db.insert(testimonials).values(testimonial).returning();
+    return newTestimonial;
+  }
+
+  async updateTestimonial(id: string, testimonialData: Partial<Testimonial>): Promise<void> {
+    await db.update(testimonials).set({ ...testimonialData, updatedAt: new Date() }).where(eq(testimonials.id, id));
+  }
+
+  async deleteTestimonial(id: string): Promise<void> {
+    await db.delete(testimonials).where(eq(testimonials.id, id));
+  }
+
+  // Lead sources
+  async getLeadSources(): Promise<LeadSource[]> {
+    return await db.select().from(leadSources).where(eq(leadSources.isActive, true)).orderBy(asc(leadSources.name));
+  }
+
+  async createLeadSource(leadSourceData: Partial<LeadSource>): Promise<LeadSource> {
+    const [newLeadSource] = await db.insert(leadSources).values(leadSourceData as any).returning();
+    return newLeadSource;
+  }
+
+  // Enhanced analytics
+  async getVendorStats(vendorId: string): Promise<{
+    totalProducts: number;
+    activeOrders: number;
+    monthlyRevenue: string;
+    inventoryItems: number;
+  }> {
+    const [productCount] = await db.select({ count: count() }).from(products).where(eq(products.vendorId, vendorId));
+    
+    const [orderCount] = await db.select({ count: count() }).from(orders)
+      .where(and(eq(orders.vendorId, vendorId), sql`${orders.status} IN ('pending', 'processing')`));
+    
+    const [revenueSum] = await db.select({ sum: sum(orders.totalAmount) }).from(orders)
+      .where(and(eq(orders.vendorId, vendorId), sql`EXTRACT(MONTH FROM ${orders.orderDate}) = EXTRACT(MONTH FROM CURRENT_DATE)`));
+    
+    const [inventoryCount] = await db.select({ sum: sum(products.stockQuantity) }).from(products)
+      .where(eq(products.vendorId, vendorId));
+
+    return {
+      totalProducts: productCount.count,
+      activeOrders: orderCount.count,
+      monthlyRevenue: revenueSum.sum || '0',
+      inventoryItems: inventoryCount.sum || 0,
+    };
+  }
+
+  async getDesignerStats(designerId: string): Promise<{
+    activeProjects: number;
+    completedProjects: number;
+    totalRevenue: string;
+    customerRating: number;
+  }> {
+    const [activeCount] = await db.select({ count: count() }).from(projects)
+      .where(and(eq(projects.designerId, designerId), sql`${projects.status} IN ('assigned', 'in_progress')`));
+    
+    const [completedCount] = await db.select({ count: count() }).from(projects)
+      .where(and(eq(projects.designerId, designerId), eq(projects.status, 'completed')));
+    
+    // This would require a more complex calculation based on project budgets and commission
+    const totalRevenue = '0'; // Placeholder
+    const customerRating = 4.5; // Placeholder
+
+    return {
+      activeProjects: activeCount.count,
+      completedProjects: completedCount.count,
+      totalRevenue,
+      customerRating,
+    };
+  }
+
+  async getAdminCityStats(cityId?: string): Promise<Array<{
+    cityName: string;
+    activeProjects: number;
+    pendingLeads: number;
+    revenue: string;
+    designersCount: number;
+    vendorsCount: number;
+  }>> {
+    // Complex query that would join multiple tables
+    // For now, returning sample data structure
+    const citiesData = await this.getCities();
+    
+    return citiesData.map(city => ({
+      cityName: city.name,
+      activeProjects: 0, // Would be calculated from actual data
+      pendingLeads: 0,
+      revenue: '0',
+      designersCount: 0,
+      vendorsCount: 0,
+    }));
   }
 }
 

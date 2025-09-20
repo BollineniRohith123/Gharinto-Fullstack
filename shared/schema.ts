@@ -191,6 +191,88 @@ export const platformConfig = pgTable("platform_config", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Dynamic RBAC Tables
+export const roles = pgTable("roles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull().unique(),
+  displayName: varchar("display_name").notNull(),
+  description: text("description"),
+  level: integer("level").notNull(), // Hierarchy level
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const permissions = pgTable("permissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull().unique(),
+  displayName: varchar("display_name").notNull(),
+  description: text("description"),
+  module: varchar("module").notNull(), // e.g., 'users', 'projects', 'analytics'
+  action: varchar("action").notNull(), // e.g., 'create', 'read', 'update', 'delete'
+  resource: varchar("resource"), // specific resource identifier
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const rolePermissions = pgTable("role_permissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  roleId: varchar("role_id").notNull(),
+  permissionId: varchar("permission_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const menuItems = pgTable("menu_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  roleId: varchar("role_id").notNull(),
+  itemId: varchar("item_id").notNull(), // unique identifier for the menu item
+  label: varchar("label").notNull(),
+  icon: varchar("icon").notNull(),
+  href: varchar("href"),
+  parentId: varchar("parent_id"), // for nested menus
+  sortOrder: integer("sort_order").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Homepage testimonials table
+export const testimonials = pgTable("testimonials", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientName: varchar("client_name").notNull(),
+  clientImage: varchar("client_image"),
+  testimonialText: text("testimonial_text").notNull(),
+  projectTitle: varchar("project_title"),
+  rating: integer("rating").default(5),
+  isActive: boolean("is_active").default(true),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Lead source tracking
+export const leadSources = pgTable("lead_sources", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Update leads table to include source
+export const leadsEnhanced = pgTable("leads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull(),
+  designerId: varchar("designer_id"),
+  assignedById: varchar("assigned_by_id"),
+  sourceId: varchar("source_id"), // Reference to lead source
+  status: leadStatusEnum("status").default('new'),
+  score: integer("score").default(0), // AI lead scoring
+  assignedAt: timestamp("assigned_at"),
+  respondedAt: timestamp("responded_at"),
+  convertedAt: timestamp("converted_at"),
+  metadata: jsonb("metadata"), // Additional lead data
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ one, many }) => ({
   city: one(cities, {
@@ -304,6 +386,57 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
   }),
 }));
 
+// New relations for RBAC
+export const rolesRelations = relations(roles, ({ many }) => ({
+  rolePermissions: many(rolePermissions),
+  menuItems: many(menuItems),
+}));
+
+export const permissionsRelations = relations(permissions, ({ many }) => ({
+  rolePermissions: many(rolePermissions),
+}));
+
+export const rolePermissionsRelations = relations(rolePermissions, ({ one }) => ({
+  role: one(roles, {
+    fields: [rolePermissions.roleId],
+    references: [roles.id],
+  }),
+  permission: one(permissions, {
+    fields: [rolePermissions.permissionId],
+    references: [permissions.id],
+  }),
+}));
+
+export const menuItemsRelations = relations(menuItems, ({ one }) => ({
+  role: one(roles, {
+    fields: [menuItems.roleId],
+    references: [roles.id],
+  }),
+}));
+
+export const leadSourcesRelations = relations(leadSources, ({ many }) => ({
+  leads: many(leadsEnhanced),
+}));
+
+export const leadsEnhancedRelations = relations(leadsEnhanced, ({ one }) => ({
+  project: one(projects, {
+    fields: [leadsEnhanced.projectId],
+    references: [projects.id],
+  }),
+  designer: one(users, {
+    fields: [leadsEnhanced.designerId],
+    references: [users.id],
+  }),
+  assignedBy: one(users, {
+    fields: [leadsEnhanced.assignedById],
+    references: [users.id],
+  }),
+  source: one(leadSources, {
+    fields: [leadsEnhanced.sourceId],
+    references: [leadSources.id],
+  }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -376,3 +509,17 @@ export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+
+// Enhanced types for new tables
+export type Role = typeof roles.$inferSelect;
+export type Permission = typeof permissions.$inferSelect;
+export type RolePermission = typeof rolePermissions.$inferSelect;
+export type MenuItem = typeof menuItems.$inferSelect;
+export type Testimonial = typeof testimonials.$inferSelect;
+export type LeadSource = typeof leadSources.$inferSelect;
+export type LeadEnhanced = typeof leadsEnhanced.$inferSelect;
+
+export type InsertRole = typeof roles.$inferInsert;
+export type InsertPermission = typeof permissions.$inferInsert;
+export type InsertMenuItem = typeof menuItems.$inferInsert;
+export type InsertTestimonial = typeof testimonials.$inferInsert;

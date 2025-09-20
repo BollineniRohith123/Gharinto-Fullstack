@@ -1,7 +1,7 @@
 import { Home, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { getNavigationItems } from "@/lib/navigation";
+import { useNavigation } from "@/hooks/useNavigation";
 import type { User } from "@shared/schema";
 
 interface SidebarProps {
@@ -9,7 +9,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ user }: SidebarProps) {
-  const navigationItems = getNavigationItems(user.role || 'customer');
+  const { navigationItems, isLoading, isDynamic } = useNavigation(user.role || 'customer');
 
   const handleLogout = () => {
     window.location.href = "/api/logout";
@@ -47,21 +47,34 @@ export default function Sidebar({ user }: SidebarProps) {
       {/* Navigation Menu */}
       <nav className="p-4">
         <div className="space-y-2">
-          {navigationItems.map((item) => (
-            <Button
-              key={item.id}
-              variant="ghost"
-              className={cn(
-                "w-full justify-start text-muted-foreground hover:text-foreground hover:bg-accent",
-                "transition-colors"
-              )}
-              data-testid={`nav-${item.id}`}
-            >
-              <item.icon className="mr-3 h-4 w-4" />
-              {item.label}
-            </Button>
-          ))}
+          {isLoading ? (
+            <div className="space-y-2">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="h-10 bg-muted rounded-lg animate-pulse"></div>
+              ))}
+            </div>
+          ) : (
+            navigationItems.map((item) => (
+              <Button
+                key={item.id}
+                variant="ghost"
+                className={cn(
+                  "w-full justify-start text-muted-foreground hover:text-foreground hover:bg-accent",
+                  "transition-colors"
+                )}
+                data-testid={`nav-${item.id}`}
+              >
+                <item.icon className="mr-3 h-4 w-4" />
+                {item.label}
+              </Button>
+            ))
+          )}
         </div>
+        {isDynamic && (
+          <div className="mt-4 text-xs text-green-600 px-2">
+            Dynamic menu loaded
+          </div>
+        )}
       </nav>
 
       {/* User Profile Section */}

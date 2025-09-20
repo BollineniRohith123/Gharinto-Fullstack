@@ -8,6 +8,7 @@ import { Users, Building, DollarSign, MapPin, Plus, Edit, Settings, Check, Serve
 import { apiRequest } from "@/lib/queryClient";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import RoleManagement from "./components/RoleManagement";
 
 export default function SuperAdminDashboard() {
   const { toast } = useToast();
@@ -235,12 +236,8 @@ export default function SuperAdminDashboard() {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Role Management</CardTitle>
-            <Button variant="outline" size="sm" data-testid="button-configure-roles">
-              <Settings className="w-4 h-4 mr-2" />
-              Configure
-            </Button>
+          <CardHeader>
+            <CardTitle>Quick Role Overview</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -260,9 +257,6 @@ export default function SuperAdminDashboard() {
                       <p className="text-sm text-muted-foreground">{roleData.users} users</p>
                     </div>
                   </div>
-                  <Button variant="ghost" size="sm" data-testid={`button-edit-role-${roleData.role.toLowerCase()}`}>
-                    <Edit className="w-4 h-4" />
-                  </Button>
                 </div>
               ))}
             </div>
@@ -347,6 +341,9 @@ export default function SuperAdminDashboard() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Full Role Management */}
+      <RoleManagement />
     </div>
   );
 }
