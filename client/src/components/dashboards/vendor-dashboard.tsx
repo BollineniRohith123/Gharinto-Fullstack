@@ -65,7 +65,7 @@ export default function VendorDashboard() {
 
   const vendorLowStock = Array.isArray(lowStockProducts) ? lowStockProducts.filter((product: any) => 
     products.some((p: any) => p.id === product.id)
-  );
+  ) : [];
 
   // Update order status mutation
   const updateOrderMutation = useMutation({
