@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { authorize, authorizeResourceOwnership, authorizeCityAccess, type AuthenticatedRequest } from "./middleware/authorization";
 import { z } from "zod";
 import { insertProjectSchema, insertLeadSchema, insertVendorSchema, insertProductSchema, insertCitySchema } from "@shared/schema";
 import { notificationService } from "./services/notificationService";
@@ -36,7 +37,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/cities', isAuthenticated, async (req, res) => {
+  app.post('/api/cities', isAuthenticated, authorize('admin'), async (req, res) => {
     try {
       const cityData = insertCitySchema.parse(req.body);
       const city = await storage.createCity(cityData);
@@ -47,7 +48,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/cities/:id/status', isAuthenticated, async (req, res) => {
+  app.patch('/api/cities/:id/status', isAuthenticated, authorize('admin'), async (req, res) => {
     try {
       const { id } = req.params;
       const { isActive } = req.body;
@@ -98,7 +99,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/projects/:id/assign', isAuthenticated, async (req, res) => {
+  app.patch('/api/projects/:id/assign', isAuthenticated, authorize('admin'), async (req, res) => {
     try {
       const { id } = req.params;
       const { designerId } = req.body;
@@ -129,11 +130,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Lead management routes
-  app.get('/api/leads', isAuthenticated, async (req, res) => {
+  app.get('/api/leads', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const { designerId, status } = req.query;
+      const currentUser = (req as any).currentUser;
+      
+      // Users can only see their own leads unless they're admin+
+      let queryDesignerId = designerId as string;
+      if (currentUser?.role !== 'admin' && currentUser?.role !== 'super_admin') {
+        queryDesignerId = req.user?.claims?.sub || '';
+      }
+      
       const leads = await storage.getLeads({
-        designerId: designerId as string,
+        designerId: queryDesignerId,
         status: status as string,
       });
       res.json(leads);
@@ -143,7 +152,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/leads/:id/respond', isAuthenticated, async (req, res) => {
+  app.patch('/api/leads/:id/respond', isAuthenticated, authorizeResourceOwnership(async (req: AuthenticatedRequest) => {
+    const lead = await storage.getLeads({ designerId: req.user?.claims?.sub || '' });
+    const currentLead = lead.find(l => l.id === req.params.id);
+    return currentLead?.designerId || null;
+  }), async (req, res) => {
     try {
       const { id } = req.params;
       const { status } = req.body; // 'accepted' or 'declined'
@@ -171,7 +184,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // User management routes
-  app.get('/api/users/pending-approval', isAuthenticated, async (req, res) => {
+  app.get('/api/users/pending-approval', isAuthenticated, authorize('admin'), async (req, res) => {
     try {
       const pendingUsers = await storage.getUsersAwaitingApproval();
       res.json(pendingUsers);
@@ -181,7 +194,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/users/:id/approve', isAuthenticated, async (req, res) => {
+  app.patch('/api/users/:id/approve', isAuthenticated, authorize('admin'), async (req, res) => {
     try {
       const { id } = req.params;
       const { isApproved } = req.body;
@@ -289,7 +302,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Notification routes
-  app.get('/api/notifications', isAuthenticated, async (req, res) => {
+  app.get('/api/notifications', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.user?.claims?.sub;
       if (!userId) {
@@ -303,7 +316,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/notifications/:id/read', isAuthenticated, async (req, res) => {
+  app.patch('/api/notifications/:id/read', isAuthenticated, authorizeResourceOwnership(async (req: AuthenticatedRequest) => {
+    const notification = await storage.getNotificationsByUser(req.user?.claims?.sub || '');
+    const targetNotification = notification.find(n => n.id === req.params.id);
+    return targetNotification?.userId || null;
+  }), async (req, res) => {
     try {
       const { id } = req.params;
       await storage.markNotificationAsRead(id);
@@ -326,7 +343,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Platform configuration routes
-  app.get('/api/config/platform', isAuthenticated, async (req, res) => {
+  app.get('/api/config/platform', isAuthenticated, authorize('admin'), async (req, res) => {
     try {
       const config = await storage.getPlatformConfig();
       res.json(config);
@@ -336,7 +353,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/config/platform', isAuthenticated, async (req, res) => {
+  app.patch('/api/config/platform', isAuthenticated, authorize('super_admin'), async (req, res) => {
     try {
       await storage.updatePlatformConfig(req.body);
       res.json({ success: true });
