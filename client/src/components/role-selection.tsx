@@ -94,7 +94,7 @@ export default function RoleSelection() {
   };
 
   const handleBackToLogin = () => {
-    window.location.href = '/api/logout';
+    window.location.href = '/auth/logout';
   };
 
   if (!user) {

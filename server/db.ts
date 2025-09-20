@@ -1,6 +1,10 @@
+import dotenv from 'dotenv';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import * as schema from "@shared/schema";
+
+// Load environment variables first
+dotenv.config();
 
 if (!process.env.DATABASE_URL) {
   throw new Error(

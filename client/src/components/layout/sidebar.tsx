@@ -12,7 +12,7 @@ export default function Sidebar({ user }: SidebarProps) {
   const { navigationItems, isLoading, isDynamic } = useNavigation(user.role || 'customer');
 
   const handleLogout = () => {
-    window.location.href = "/api/logout";
+    window.location.href = "/auth/logout";
   };
 
   const getRoleDisplayName = (role: string) => {

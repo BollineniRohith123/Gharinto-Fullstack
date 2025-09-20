@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,7 @@ import {
 export default function Landing() {
   const [showQuoteForm, setShowQuoteForm] = useState(false);
   const [showPartnerForm, setShowPartnerForm] = useState(false);
+  const [cities, setCities] = useState<Array<{id: string, name: string, state: string}>>([]);
   const [quoteForm, setQuoteForm] = useState({
     name: '',
     email: '',
@@ -49,44 +50,84 @@ export default function Landing() {
   });
 
   const handleLogin = () => {
-    window.location.href = "/api/login";
+    window.location.href = "/auth/login";
   };
 
-  const handleQuoteSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    // Fetch cities from API
+    fetch('/api/cities')
+      .then(response => response.json())
+      .then(data => setCities(data))
+      .catch(error => console.error('Error fetching cities:', error));
+  }, []);
+
+  const handleQuoteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Integrate with lead creation API
-    console.log('Quote form submitted:', quoteForm);
-    // Reset form and show success message
-    setQuoteForm({
-      name: '',
-      email: '',
-      phone: '',
-      city: '',
-      projectType: '',
-      budget: '',
-      description: ''
-    });
-    setShowQuoteForm(false);
-    alert('Thank you! We will contact you within 24 hours.');
+    try {
+      const response = await fetch('/api/leads', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(quoteForm),
+      });
+
+      if (response.ok) {
+        // Reset form and show success message
+        setQuoteForm({
+          name: '',
+          email: '',
+          phone: '',
+          city: '',
+          projectType: '',
+          budget: '',
+          description: ''
+        });
+        setShowQuoteForm(false);
+        alert('Thank you! We will contact you within 24 hours.');
+      } else {
+        const error = await response.json();
+        alert(`Error: ${error.message || 'Failed to submit quote request'}`);
+      }
+    } catch (error) {
+      console.error('Error submitting quote:', error);
+      alert('Error submitting quote request. Please try again.');
+    }
   };
 
-  const handlePartnerSubmit = (e: React.FormEvent) => {
+  const handlePartnerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Integrate with partner registration API
-    console.log('Partner form submitted:', partnerForm);
-    // Reset form and show success message
-    setPartnerForm({
-      name: '',
-      email: '',
-      phone: '',
-      businessName: '',
-      role: '',
-      city: '',
-      experience: '',
-      description: ''
-    });
-    setShowPartnerForm(false);
-    alert('Thank you! Our team will review your application and contact you soon.');
+    try {
+      const response = await fetch('/api/users/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(partnerForm),
+      });
+
+      if (response.ok) {
+        // Reset form and show success message
+        setPartnerForm({
+          name: '',
+          email: '',
+          phone: '',
+          businessName: '',
+          role: '',
+          city: '',
+          experience: '',
+          description: ''
+        });
+        setShowPartnerForm(false);
+        alert('Thank you! Our team will review your application and contact you soon.');
+      } else {
+        const error = await response.json();
+        alert(`Error: ${error.message || 'Failed to submit registration'}`);
+      }
+    } catch (error) {
+      console.error('Error submitting registration:', error);
+      alert('Error submitting registration. Please try again.');
+    }
   };
 
   // Sample testimonials - in production, these would come from API
@@ -140,9 +181,7 @@ export default function Landing() {
     { value: 'builder', label: 'Builder/Developer' }
   ];
 
-  const cities = [
-    'Bangalore', 'Mumbai', 'Delhi', 'Hyderabad', 'Chennai', 'Pune', 'Kolkata', 'Ahmedabad'
-  ];
+
 
   const projectTypes = [
     'Full Home Interior', 'Modular Kitchen', 'Living Room', 'Bedroom', 'Bathroom', 'Office Space'
@@ -480,7 +519,7 @@ export default function Landing() {
                       </SelectTrigger>
                       <SelectContent>
                         {cities.map(city => (
-                          <SelectItem key={city} value={city}>{city}</SelectItem>
+                          <SelectItem key={city.id} value={city.id}>{city.name}, {city.state}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -604,7 +643,7 @@ export default function Landing() {
                       </SelectTrigger>
                       <SelectContent>
                         {cities.map(city => (
-                          <SelectItem key={city} value={city}>{city}</SelectItem>
+                          <SelectItem key={city.id} value={city.id}>{city.name}, {city.state}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>

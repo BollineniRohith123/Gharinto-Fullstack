@@ -1,5 +1,6 @@
 // Simple storage service for SQLite demo
 import { pool } from "./db";
+import { nanoid } from 'nanoid';
 
 export const simpleStorage = {
   // Get testimonials
@@ -181,8 +182,18 @@ export const simpleStorage = {
     try {
       const stmt = pool.prepare("SELECT * FROM platform_config LIMIT 1");
       const result = stmt.get();
-      
-      return result || {
+
+      if (result) {
+        return {
+          id: result.id,
+          designerCommission: result.designer_commission,
+          platformFee: result.platform_fee,
+          vendorCommission: result.vendor_commission,
+          updatedAt: new Date(result.updated_at * 1000).toISOString(),
+        };
+      }
+
+      return {
         designerCommission: 15.00,
         platformFee: 5.00,
         vendorCommission: 8.00
@@ -201,10 +212,177 @@ export const simpleStorage = {
   async getUsersAwaitingApproval() { return []; },
   async updateUserApprovalStatus() { return true; },
   async createProject() { return {}; },
-  async createLead() { return {}; },
+  async createLead(leadData: {
+    name: string;
+    email: string;
+    phone: string;
+    city: string;
+    projectType: string;
+    budget: string;
+    description: string;
+  }) {
+    try {
+      // First create a temporary customer record or use anonymous customer
+      const customerId = `temp-customer-${nanoid()}`;
+      const projectId = nanoid();
+      const timestamp = Math.floor(Date.now() / 1000);
+
+      // Parse budget range to get numeric value
+      const budgetValue = parseFloat(leadData.budget.split('-')[0]) || 0;
+
+      const stmt = pool.prepare(`
+        INSERT INTO projects (id, title, description, customer_id, city_id, budget, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, 'lead', ?, ?)
+      `);
+
+      const title = `${leadData.projectType} - ${leadData.name}`;
+      const description = `${leadData.description}\n\nContact: ${leadData.email}, ${leadData.phone}\nBudget Range: ${leadData.budget}`;
+
+      stmt.run(projectId, title, description, customerId, leadData.city, budgetValue, timestamp, timestamp);
+
+      return {
+        id: projectId,
+        title,
+        description,
+        customerId,
+        cityId: leadData.city,
+        budget: budgetValue,
+        status: 'lead',
+        customerName: leadData.name,
+        email: leadData.email,
+        phone: leadData.phone,
+        projectType: leadData.projectType,
+        budgetRange: leadData.budget,
+        createdAt: new Date(timestamp * 1000).toISOString(),
+        updatedAt: new Date(timestamp * 1000).toISOString()
+      };
+    } catch (error) {
+      console.error('Error creating lead:', error);
+      throw error;
+    }
+  },
   async createVendor() { return {}; },
+
+  async createUserRegistration(userData: {
+    name: string;
+    email: string;
+    phone: string;
+    businessName: string;
+    role: string;
+    city: string;
+    experience: string;
+    description: string;
+  }) {
+    try {
+      const id = nanoid();
+      const timestamp = Math.floor(Date.now() / 1000);
+
+      const stmt = pool.prepare(`
+        INSERT INTO users (id, email, first_name, last_name, profile_image_url, role, city_id, is_approved, created_at, updated_at)
+        VALUES (?, ?, ?, ?, NULL, ?, ?, 0, ?, ?)
+      `);
+
+      const [firstName, ...lastNameParts] = userData.name.split(' ');
+      const lastName = lastNameParts.join(' ') || '';
+
+      stmt.run(id, userData.email, firstName, lastName, userData.role, userData.city, timestamp, timestamp);
+
+      return {
+        id,
+        email: userData.email,
+        firstName,
+        lastName,
+        role: userData.role,
+        cityId: userData.city,
+        isApproved: false,
+        businessName: userData.businessName,
+        experience: userData.experience,
+        description: userData.description,
+        createdAt: new Date(timestamp * 1000).toISOString(),
+        updatedAt: new Date(timestamp * 1000).toISOString()
+      };
+    } catch (error) {
+      console.error('Error creating user registration:', error);
+      throw error;
+    }
+  },
   async createProduct() { return {}; },
-  async createCity() { return {}; },
+  async createCity(cityData: { name: string; state: string }) {
+    try {
+      const id = `city-${cityData.name.toLowerCase().replace(/\s+/g, '-')}`;
+      const now = Math.floor(Date.now() / 1000);
+
+      const stmt = pool.prepare(`
+        INSERT INTO cities (id, name, state, is_active, created_at)
+        VALUES (?, ?, ?, 1, ?)
+      `);
+
+      stmt.run(id, cityData.name, cityData.state, now);
+
+      return {
+        id,
+        name: cityData.name,
+        state: cityData.state,
+        is_active: 1,
+        created_at: now,
+        isActive: true,
+        createdAt: new Date(now * 1000).toISOString(),
+      };
+    } catch (error) {
+      console.error('Error creating city:', error);
+      throw error;
+    }
+  },
+
+  async updateCity(cityId: string, updates: any) {
+    try {
+      const now = Math.floor(Date.now() / 1000);
+      const fields = [];
+      const values = [];
+
+      if (updates.name) {
+        fields.push('name = ?');
+        values.push(updates.name);
+      }
+      if (updates.state) {
+        fields.push('state = ?');
+        values.push(updates.state);
+      }
+      if (updates.isActive !== undefined) {
+        fields.push('is_active = ?');
+        values.push(updates.isActive ? 1 : 0);
+      }
+
+      if (fields.length === 0) {
+        throw new Error('No fields to update');
+      }
+
+      fields.push('updated_at = ?');
+      values.push(now);
+      values.push(cityId);
+
+      const stmt = pool.prepare(`
+        UPDATE cities SET ${fields.join(', ')} WHERE id = ?
+      `);
+
+      stmt.run(...values);
+
+      // Return updated city
+      const getStmt = pool.prepare("SELECT * FROM cities WHERE id = ?");
+      const result = getStmt.get(cityId);
+
+      return {
+        ...result,
+        isActive: Boolean(result.is_active),
+        createdAt: new Date(result.created_at * 1000).toISOString(),
+        updatedAt: new Date(result.updated_at * 1000).toISOString(),
+      };
+    } catch (error) {
+      console.error('Error updating city:', error);
+      throw error;
+    }
+  },
+
   async updateCityStatus() { return true; },
   async assignDesignerToProject() { return true; },
   async updateLeadStatus() { return true; },
@@ -232,5 +410,63 @@ export const simpleStorage = {
   async getAdminCityStats() { return {}; },
   async upsertUser() { return {}; },
   async getUsersByRole() { return []; },
-  async updatePlatformConfig() { return true; }
+  async updatePlatformConfig(configData: any) {
+    try {
+      const now = Math.floor(Date.now() / 1000);
+
+      // Check if config exists
+      const existingStmt = pool.prepare("SELECT * FROM platform_config LIMIT 1");
+      const existing = existingStmt.get();
+
+      if (existing) {
+        // Update existing config
+        const fields = [];
+        const values = [];
+
+        if (configData.designerCommission !== undefined) {
+          fields.push('designer_commission = ?');
+          values.push(parseFloat(configData.designerCommission));
+        }
+        if (configData.platformFee !== undefined) {
+          fields.push('platform_fee = ?');
+          values.push(parseFloat(configData.platformFee));
+        }
+        if (configData.vendorCommission !== undefined) {
+          fields.push('vendor_commission = ?');
+          values.push(parseFloat(configData.vendorCommission));
+        }
+
+        if (fields.length > 0) {
+          fields.push('updated_at = ?');
+          values.push(now);
+          values.push(existing.id);
+
+          const updateStmt = pool.prepare(`
+            UPDATE platform_config SET ${fields.join(', ')} WHERE id = ?
+          `);
+          updateStmt.run(...values);
+        }
+      } else {
+        // Create new config
+        const insertStmt = pool.prepare(`
+          INSERT INTO platform_config (id, designer_commission, platform_fee, vendor_commission, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `);
+        insertStmt.run(
+          'default-config',
+          parseFloat(configData.designerCommission) || 15,
+          parseFloat(configData.platformFee) || 5,
+          parseFloat(configData.vendorCommission) || 8,
+          now,
+          now
+        );
+      }
+
+      // Return updated config
+      return await this.getPlatformConfig();
+    } catch (error) {
+      console.error('Error updating platform config:', error);
+      throw error;
+    }
+  }
 };

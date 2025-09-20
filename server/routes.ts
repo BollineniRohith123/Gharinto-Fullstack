@@ -8,6 +8,15 @@ import { z } from "zod";
 // import { notificationService } from "./services/notificationService";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Health check endpoint
+  app.get('/api/health', (req, res) => {
+    res.json({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      version: '1.0.0'
+    });
+  });
+
   // Setup mock authentication instead of Replit OAuth
   await setupMockAuth(app);
 
@@ -34,6 +43,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching cities:", error);
       res.status(500).json({ message: "Failed to fetch cities" });
+    }
+  });
+
+  app.post('/api/cities', isAuthenticated, async (req, res) => {
+    try {
+      const { name, state } = req.body;
+      if (!name || !state) {
+        return res.status(400).json({ message: "Name and state are required" });
+      }
+      const city = await storage.createCity({ name, state });
+      res.json(city);
+    } catch (error) {
+      console.error("Error creating city:", error);
+      res.status(500).json({ message: "Failed to create city" });
+    }
+  });
+
+  app.patch('/api/cities/:id', isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      const city = await storage.updateCity(id, updates);
+      res.json(city);
+    } catch (error) {
+      console.error("Error updating city:", error);
+      res.status(500).json({ message: "Failed to update city" });
     }
   });
 
@@ -132,10 +167,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Platform configuration routes
+  app.get('/api/config/platform', isAuthenticated, async (req, res) => {
+    try {
+      const config = await storage.getPlatformConfig();
+      res.json(config);
+    } catch (error) {
+      console.error("Error fetching platform config:", error);
+      res.status(500).json({ message: "Failed to fetch platform config" });
+    }
+  });
+
+  app.patch('/api/config/platform', isAuthenticated, async (req, res) => {
+    try {
+      const config = await storage.updatePlatformConfig(req.body);
+      res.json(config);
+    } catch (error) {
+      console.error("Error updating platform config:", error);
+      res.status(500).json({ message: "Failed to update platform config" });
+    }
+  });
+
+  // Lead creation endpoint (public)
+  app.post('/api/leads', async (req, res) => {
+    try {
+      const { name, email, phone, city, projectType, budget, description } = req.body;
+
+      if (!name || !email || !phone || !city || !projectType || !budget) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const lead = await storage.createLead({
+        name,
+        email,
+        phone,
+        city,
+        projectType,
+        budget,
+        description: description || ''
+      });
+
+      res.status(201).json(lead);
+    } catch (error) {
+      console.error("Error creating lead:", error);
+      res.status(500).json({ message: "Failed to create lead" });
+    }
+  });
+
+  // User registration endpoint (public)
+  app.post('/api/users/register', async (req, res) => {
+    try {
+      const { name, email, phone, businessName, role, city, experience, description } = req.body;
+
+      if (!name || !email || !phone || !role || !city) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const user = await storage.createUserRegistration({
+        name,
+        email,
+        phone,
+        businessName: businessName || '',
+        role,
+        city,
+        experience: experience || '',
+        description: description || ''
+      });
+
+      res.status(201).json(user);
+    } catch (error) {
+      console.error("Error creating user registration:", error);
+      res.status(500).json({ message: "Failed to create user registration" });
+    }
+  });
+
   // Mock other endpoints for now
   const mockEndpoints = [
-    '/api/leads', '/api/orders', '/api/notifications', '/api/users/pending-approval',
-    '/api/permissions', '/api/menu-items', '/api/lead-sources', '/api/config/platform'
+    '/api/orders', '/api/notifications', '/api/users/pending-approval',
+    '/api/permissions', '/api/menu-items', '/api/lead-sources'
   ];
 
   mockEndpoints.forEach(endpoint => {
