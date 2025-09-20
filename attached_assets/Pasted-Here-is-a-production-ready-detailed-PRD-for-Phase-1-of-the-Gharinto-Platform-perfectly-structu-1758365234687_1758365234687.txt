@@ -1,0 +1,150 @@
+Here is a **production-ready, detailed PRD for Phase-1 of the Gharinto Platform**, perfectly structured and clearly covering all required aspects. This is tailored for immediate implementation and focused on launch-critical features, platform architecture, user roles, and initial workflows.
+
+***
+
+# Gharinto Platform – Product Requirements Document (PRD)
+## Version: Phase-1 Production Launch
+
+***
+
+## 1. Executive Summary
+
+**Gharinto** is a next-generation, technology-driven, three-sided marketplace transforming India’s home interiors sector. Targeting Homeowners, Designers, and Vendors, it emphasizes transparency, predictable timelines/costs, quality, and operational excellence.
+**This PRD details Phase-1 features, user roles, architecture, and workflows for a robust MVP.**
+
+***
+
+## 2. Platform Vision & Goals
+
+- **Vision:** Deliver a seamless, transparent, and efficient ecosystem for home interior projects, connecting customers with trusted designers and verified vendors.
+- **Phase-1 Goals:** 
+  - Launch core admin tools, role management, onboarding.
+  - Deliver full project and lead management backbone.
+  - Enable partner onboarding (designer/vendor).
+  - Provide homeowners with a basic tracking dashboard.
+  - Instil world-class security and operational best practices from day one.
+
+***
+
+## 3. User Roles & Permissions (Dynamic RBAC)
+
+| Role         | Core Abilities (Phase-1)                                                                                                                |
+|--------------|------------------------------------------------------------------------------------------------------------------------------------------|
+| Super Admin  | Complete system access; configure roles, commissions, permissions; set up cities; live system health; basic platform analytics.           |
+| Admin        | Operations setup; onboarding of designers/vendors/employees; lead assignment; city filter; monitor financials; reroute/escalate leads.    |
+| Designer     | Accept/decline leads; create designs; communicate with customers; manage project BOQ & docs; onboard team members (for test).             |
+| Customer     | Register/request project; view project status; communicate with designer/PM; access digital vault (project docs, contracts, images).      |
+| Vendor       | Register; list products/services; manage basic inventory; receive orders; fulfill and update order status.                                |
+| Employee     | Task-specific access; support onboarding/testing for role workflows (optional, for test cities only).                                     |
+
+- **Dynamic Role Management:** All permissions, cardinality, sidebars, menus driven via DB for total flexibility (no static FE sidebars).
+
+***
+
+## 4. Phase-1 Functional Modules
+
+### 4.1 Super Admin Dashboard
+- City management (add/edit/delete, regional settings).
+- Global system/stats view (users, projects, leads, vendors).
+- Role/permission assignment; see all active users by role/city.
+- Configure commission (%), platform fees, and assignment algorithms.
+- Employee lifecycle management: Add, revoke, transfer roles.
+- System logs: All major changes/events with timestamps.
+
+### 4.2 Operations Admin Panel
+- View/add/approve new designers/vendors/employees.
+- Assign/reassign leads & projects (auto/manual).
+- Reroute projects between cities.
+- City-wise dashboard: active users, leads, projects, escalations.
+- Financial monitoring: Real-time transaction summary (high-level).
+
+### 4.3 Lead & Project Management Backbone
+- Unified pipeline to receive and manage all new leads (from site, referrals, campaigns).
+- Segmentation: by city, project type, priority.
+- Automated assignment on logic (rotate, skill, load-balancing), with manual override.
+- Track each project's stage (lead, design assigned, in progress, completed).
+- Trigger notifications for assignment, approvals, escalations.
+- Project digital folder: docs, contracts, images, design files.
+- Timeline: Gantt/phase tracker (basic, for phase-1).
+
+### 4.4 Designer Portal
+- View assigned leads, accept/decline.
+- Basic project tracker (milestones, status updates, comms).
+- Upload designs/BOQ, access resource vault.
+- In-app chat/email with customer & admin/PM.
+- Analytics: See basic lead conversion ratio, project statuses.
+
+### 4.5 Vendor Portal
+- Partner onboarding (approval workflow).
+- Product/service listing, including pricing (with admin review).
+- Basic inventory tracking (quantity, location, reorder, restock alert).
+- Order receipt and fulfillment update flow.
+- View order/payments dashboard (summary only in v1).
+
+### 4.6 Customer Portal
+- Register/view dashboard of own projects.
+- See project status (milestones, assigned designer/PM, timeline).
+- Digital vault: All project docs, agreements, designs.
+- In-app communication with designer & admin (basic, logs preserved).
+- Feedback and escalation form (routes to admin).
+
+### 4.7 Notifications & Messaging (Core)
+- All roles: System-generated and manual notifications (email/app/SMS, future WhatsApp).
+- Real-time updates for key actions: assignment, project updates, document upload, approvals.
+- Audit log of all comms tied to user/project.
+
+***
+
+## 5. Technical Architecture
+
+**Frontend:** React v19 (TypeScript), Tailwind, roles/menus fetched from API/DB.
+**Backend:** Node.js (Express or Nest), microservices for user/role, project, lead, notification.
+**DB:** PostgreSQL (main, normalized), Redis (cache/sessions), S3-compatible storage for documents.
+**APIs:** Secure REST (OAuth2/JWT), all permissions DB-driven; minimal hardcoding.
+**Security:** MFA, SSO for admin/super admin, scheduled token expiry, audit logs, E2EE for sensitive doc transfer, role-based/attribute checks at API/middleware.
+
+***
+
+## 6. Phase-1 Implementation Roadmap
+
+| Sprint (2 weeks) | Major Deliverables                                                                                                                           |
+|------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
+| 1-2              | Core DB schema, dynamic RBAC backend, city/role/commission setup, initial admin panel scaffolding.                                           |
+| 3-4              | Lead management pipeline, project structure, initial notification system, designer dashboard (basic lead/project workflow), vendor onboarding.|
+| 5-6              | Customer portal (dashboard + comms), digital vault, task lifecycles, project doc uploads, escalation/feedback flows, role switching/testing.  |
+| 7-8              | Audit logging, analytics MVP (user/project/lead metrics), error handling framework, security review, production deployment ready.             |
+
+***
+
+## 7. Success Metrics (Phase-1)
+
+- Onboarding: 3+ cities, 5+ designers/vendors, 10+ real user projects.
+- Lead turnaround: Assignment in <10 min, project kickoff <24hr.
+- Uptime: ≥99.9% (prod), full audit tracking.
+- Security: No unauthorized access incidents; 100% activity auditable.
+- User experience: Under 5s load time, intuitive first-use onboarding.
+
+***
+
+## 8. Risks / Mitigation
+
+- **Scope Creep:** All new features gated for Phase-2+ unless emergency for launch.
+- **Data Consistency:** Strict role-permission DB enforcement and test harness from Day 1.
+- **Security:** Periodic audits, endpoint protection, regular review.
+
+***
+
+## 9. Out of Scope for Phase-1 (Future Phases)
+
+- Real-time chat (move to phase 2).
+- Full vendor inventory, order/batch/expiry tracking.
+- AI/ML-powered lead assignment, dynamic segmentation.
+- Advanced analytics and reporting, BI suite.
+- White-labelling, multi-brand, multi-region scenario.
+- Mobile apps.
+- Feature flags/pilots for new advanced features.
+
+***
+
+### **This PRD is ready for direct use by your engineering, design, and delivery teams.**
+If you need a markdown or downloadable version or want templates for epics/tickets, let me know!
